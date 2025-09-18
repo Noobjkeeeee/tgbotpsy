@@ -1,38 +1,31 @@
 import asyncio
-from contextlib import asynccontextmanager
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from aiogram.filters.command import CommandStart
 from aiogram.fsm.context import FSMContext
 
 from bot.admin import admin_router
-from bot.database import init_db
 from bot.handlers import free_consult, paid_consult, question
 from bot.keyboards import menu_kb
 from bot.logger import error_logger
 from bot.states import Form
 from bot.storage import bot, dp
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    await bot.delete_webhook(drop_pending_updates=True)
-    asyncio.create_task(dp.start_polling(bot))
-    yield
+import uvicorn
 
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
 dp.include_router(paid_consult.router)
 dp.include_router(admin_router)
 
-
 @app.get("/", response_class=PlainTextResponse)
 async def root():
     return "Telegram bot is running"
-
 
 @dp.message(CommandStart())
 async def cmd_start(message, state: FSMContext):
@@ -50,3 +43,19 @@ async def cmd_start(message, state: FSMContext):
         await message.answer(
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
+
+async def main():
+    logging.basicConfig(level=logging.INFO)
+
+    port = int(os.getenv("PORT", 8000))
+
+    config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level="info")
+    server = uvicorn.Server(config)
+
+    polling_task = asyncio.create_task(dp.start_polling(bot))
+    server_task = asyncio.create_task(server.serve())
+
+    await asyncio.gather(polling_task, server_task)
+
+if __name__ == "__main__":
+    asyncio.run(main())
