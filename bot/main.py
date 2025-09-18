@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from aiogram.filters.command import CommandStart
@@ -12,12 +13,21 @@ from bot.logger import error_logger
 from bot.states import Form
 from bot.storage import bot, dp
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    await bot.delete_webhook(drop_pending_updates=True)
+    asyncio.create_task(dp.start_polling(bot))
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
 dp.include_router(paid_consult.router)
 dp.include_router(admin_router)
+
 
 @app.get("/", response_class=PlainTextResponse)
 async def root():
@@ -40,16 +50,3 @@ async def cmd_start(message, state: FSMContext):
         await message.answer(
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
-
-
-async def main():
-    try:
-        await init_db()
-        await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
-    except Exception as e:
-        error_logger.error(f"Исключение в main(): {e}", exc_info=True)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
