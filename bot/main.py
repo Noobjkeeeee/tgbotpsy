@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -19,8 +20,10 @@ import uvicorn
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(dp.start_polling(bot))
+    logging.info("Bot polling started")
     yield
     await bot.session.close()
+    logging.info("Bot session closed")
 
 app = FastAPI(lifespan=lifespan)
 
