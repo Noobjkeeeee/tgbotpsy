@@ -18,17 +18,21 @@ from storage import bot, dp
 import uvicorn
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+async def run_bot():
+    logging.info("Bot polling started")
+    await dp.start_polling(bot)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    polling_task = asyncio.create_task(dp.start_polling(bot))
-    logging.info("Bot polling started")
+    bot_task = asyncio.create_task(run_bot())
     try:
         yield
     finally:
-        polling_task.cancel()
+        bot_task.cancel()
         try:
-            await polling_task
+            await bot_task
         except asyncio.CancelledError:
             pass
         await bot.session.close()
@@ -62,6 +66,12 @@ async def cmd_start(message, state: FSMContext):
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
 
-if __name__ == "__main__":
+def run_fastapi():
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    host = os.getenv("HOST", "0.0.0.0")
+    logger.info(f"Starting server at {host}:{port}")
+
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+if __name__ == "__main__":
+    run_fastapi()
