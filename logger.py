@@ -6,7 +6,7 @@ logger.setLevel(logging.INFO)
 if logger.handlers:
     logger.handlers.clear()
 
-file_handler = logging.FileHandler("bot_log.log", encoding="utf-8", mode="a")
+file_handler = logging.FileHandler("bot/bot_log.log", encoding="utf-8", mode="a")
 file_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -20,7 +20,7 @@ error_logger.setLevel(logging.ERROR)
 if error_logger.handlers:
     error_logger.handlers.clear()
 
-error_handler = logging.FileHandler("bot_error.log", encoding="utf-8", mode="a")
+error_handler = logging.FileHandler("bot/bot_error.log", encoding="utf-8", mode="a")
 error_handler.setLevel(logging.ERROR)
 
 error_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -34,7 +34,7 @@ payment_logger.setLevel(logging.INFO)
 if payment_logger.handlers:
     payment_logger.handlers.clear()
 
-payment_handler = logging.FileHandler("payments.log", encoding="utf-8", mode="a")
+payment_handler = logging.FileHandler("bot/payments.log", encoding="utf-8", mode="a")
 payment_handler.setLevel(logging.INFO)
 
 payment_formatter = logging.Formatter("%(asctime)s - PAYMENT - %(message)s")

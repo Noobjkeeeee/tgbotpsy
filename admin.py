@@ -3,8 +3,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
-from bot.database import Application, AsyncSessionLocal
-from bot.logger import error_logger
+from database import Application, AsyncSessionLocal
+from logger import error_logger
 
 admin_router = Router()
 

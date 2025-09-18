@@ -7,16 +7,16 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from sqlalchemy import select
 
-from bot.config import ADMIN_CHAT_IDS, GROUP_ID
-from bot.database import (
+from config import ADMIN_CHAT_IDS, GROUP_ID
+from database import (
     AsyncSessionLocal,
     Question,
     create_question,
     update_question_answer,
 )
-from bot.states import Form
-from bot.storage import bot
-from bot.utils import is_non_empty
+from states import Form
+from storage import bot
+from utils import is_non_empty
 
 logging.basicConfig(level=logging.INFO)
 router = Router()

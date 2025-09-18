@@ -8,12 +8,12 @@ from fastapi.responses import PlainTextResponse
 from aiogram.filters.command import CommandStart
 from aiogram.fsm.context import FSMContext
 
-from bot.admin import admin_router
-from bot.handlers import free_consult, paid_consult, question
-from bot.keyboards import menu_kb
-from bot.logger import error_logger
-from bot.states import Form
-from bot.storage import bot, dp
+from admin import admin_router
+from handlers import free_consult, paid_consult, question
+from keyboards import menu_kb
+from logger import error_logger
+from states import Form
+from storage import bot, dp
 
 import uvicorn
 

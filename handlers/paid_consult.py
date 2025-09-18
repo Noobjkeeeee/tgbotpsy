@@ -11,11 +11,11 @@ from aiogram.types import (
     ReplyKeyboardRemove,
 )
 
-from bot.config import ADMIN_CHAT_IDS
-from bot.database import Application, AsyncSessionLocal
-from bot.logger import error_logger, logger
-from bot.states import Form
-from bot.utils import is_non_empty, validate_email, validate_tg_account
+from config import ADMIN_CHAT_IDS
+from database import Application, AsyncSessionLocal
+from logger import error_logger, logger
+from states import Form
+from utils import is_non_empty, validate_email, validate_tg_account
 
 router = Router()
 
