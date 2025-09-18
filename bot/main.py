@@ -1,5 +1,6 @@
 import asyncio
-
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 from aiogram.filters.command import CommandStart
 from aiogram.fsm.context import FSMContext
 
@@ -11,10 +12,16 @@ from bot.logger import error_logger
 from bot.states import Form
 from bot.storage import bot, dp
 
+app = FastAPI()
+
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
 dp.include_router(paid_consult.router)
 dp.include_router(admin_router)
+
+@app.get("/", response_class=PlainTextResponse)
+async def root():
+    return "Telegram bot is running"
 
 
 @dp.message(CommandStart())
