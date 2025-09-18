@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from dotenv import load_dotenv
 import os
 from contextlib import asynccontextmanager
 
@@ -18,47 +17,24 @@ from bot.storage import bot, dp
 
 import uvicorn
 
-load_dotenv()
-
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-bot_task = None
-
-async def run_bot():
-
-    try:
-
-        await dp.start_polling(bot)
-    except Exception as e:
-        logger.error(f"Ошибка в polling бота: {e}", exc_info=True)
-        raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global bot_task
-
+    polling_task = asyncio.create_task(dp.start_polling(bot))
+    logging.info("Bot polling started")
     try:
-        bot_task = asyncio.create_task(run_bot())
-        logger.info("Bot polling запущен")
-    except Exception as e:
-        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
-        raise
-
-    yield
-
-    if bot_task:
-        bot_task.cancel()
+        yield
+    finally:
+        polling_task.cancel()
         try:
-            await bot_task
+            await polling_task
         except asyncio.CancelledError:
-            logger.info("Bot polling остановлен")
-    await bot.session.close()
-    logger.info("Сессия бота закрыта")
-
+            pass
+        await bot.session.close()
+        logging.info("Bot session closed")
 
 app = FastAPI(lifespan=lifespan)
-
 
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
@@ -87,7 +63,5 @@ async def cmd_start(message, state: FSMContext):
         )
 
 if __name__ == "__main__":
-    import uvicorn
-
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("bot.main:app", host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=port)
