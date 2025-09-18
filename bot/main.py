@@ -18,26 +18,44 @@ from bot.storage import bot, dp
 import uvicorn
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+bot_task = None
+
+async def run_bot():
+
+    try:
+
+        await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"Ошибка в polling бота: {e}", exc_info=True)
+        raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Запускаем бот как задачу в фоне
-    bot_task = asyncio.create_task(dp.start_polling(bot))
-    logging.info("Bot polling запущен")
+    global bot_task
+
     try:
-        yield
-    finally:
-        # При завершении — останавливаем задачу
+        bot_task = asyncio.create_task(run_bot())
+        logger.info("Bot polling запущен")
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
+        raise
+
+    yield
+
+    if bot_task:
         bot_task.cancel()
         try:
             await bot_task
         except asyncio.CancelledError:
-            logging.info("Bot polling остановлен")
-        # Закрываем сессию бота
-        await bot.session.close()
-        logging.info("Сессия бота закрыта")
+            logger.info("Bot polling остановлен")
+    await bot.session.close()
+    logger.info("Сессия бота закрыта")
+
 
 app = FastAPI(lifespan=lifespan)
+
 
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
@@ -65,7 +83,20 @@ async def cmd_start(message, state: FSMContext):
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
 
-if __name__ == "__main__":
-    import uvicorn
+def run_fastapi():
+    """Запуск FastAPI сервера с поддержкой переменных окружения"""
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, log_level="info")
+    host = os.getenv("HOST", "0.0.0.0")
+
+    logger.info(f"🚀 Starting server on {host}:{port}")
+
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        log_level="info",
+        reload=False
+    )
+
+if __name__ == "__main__":
+    run_fastapi()
