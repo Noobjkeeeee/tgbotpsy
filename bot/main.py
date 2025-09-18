@@ -1,6 +1,6 @@
 import asyncio
-import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
@@ -16,7 +16,13 @@ from bot.storage import bot, dp
 
 import uvicorn
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(dp.start_polling(bot))
+    yield
+    await bot.session.close()
+
+app = FastAPI(lifespan=lifespan)
 
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
@@ -44,18 +50,6 @@ async def cmd_start(message, state: FSMContext):
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
 
-async def main():
-    logging.basicConfig(level=logging.INFO)
-
-    port = int(os.getenv("PORT", 8000))
-
-    config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level="info")
-    server = uvicorn.Server(config)
-
-    polling_task = asyncio.create_task(dp.start_polling(bot))
-    server_task = asyncio.create_task(server.serve())
-
-    await asyncio.gather(polling_task, server_task)
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
