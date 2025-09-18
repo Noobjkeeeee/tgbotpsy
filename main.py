@@ -1,7 +1,7 @@
-import asyncio
-import logging
 import os
-from contextlib import asynccontextmanager
+import logging
+import multiprocessing
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
@@ -20,25 +20,7 @@ import uvicorn
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def run_bot():
-    logging.info("Bot polling started")
-    await dp.start_polling(bot)
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    bot_task = asyncio.create_task(run_bot())
-    try:
-        yield
-    finally:
-        bot_task.cancel()
-        try:
-            await bot_task
-        except asyncio.CancelledError:
-            pass
-        await bot.session.close()
-        logging.info("Bot session closed")
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 dp.include_router(question.router)
 dp.include_router(free_consult.router)
@@ -66,12 +48,23 @@ async def cmd_start(message, state: FSMContext):
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
 
-def run_fastapi():
+def start_bot():
+    logging.info("Starting Telegram bot polling")
+    asyncio.run(dp.start_polling(bot))
+    asyncio.run(bot.session.close())
+    logging.info("Telegram bot session closed")
+
+
+def start_fastapi():
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    logger.info(f"Starting server at {host}:{port}")
-
+    logger.info(f"Starting FastAPI server at http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 if __name__ == "__main__":
-    run_fastapi()
+    bot_process = multiprocessing.Process(target=start_bot)
+    bot_process.start()
+
+    start_fastapi()
+
+    bot_process.join()
