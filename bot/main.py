@@ -86,20 +86,3 @@ async def cmd_start(message, state: FSMContext):
             "Произошла ошибка при обработке команды /start. Попробуйте позднее."
         )
 
-def run_fastapi():
-    """Запуск FastAPI сервера с поддержкой переменных окружения"""
-    port = int(os.getenv("PORT", 8000))
-    host = os.getenv("HOST", "0.0.0.0")
-
-    logger.info(f"🚀 Starting server on {host}:{port}")
-
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=port,
-        log_level="info",
-        reload=False
-    )
-
-if __name__ == "__main__":
-    run_fastapi()
