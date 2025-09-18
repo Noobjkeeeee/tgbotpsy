@@ -17,13 +17,22 @@ from bot.storage import bot, dp
 
 import uvicorn
 
+logging.basicConfig(level=logging.INFO)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(dp.start_polling(bot))
+    polling_task = asyncio.create_task(dp.start_polling(bot))
     logging.info("Bot polling started")
-    yield
-    await bot.session.close()
-    logging.info("Bot session closed")
+    try:
+        yield
+    finally:
+        polling_task.cancel()
+        try:
+            await polling_task
+        except asyncio.CancelledError:
+            pass
+        await bot.session.close()
+        logging.info("Bot session closed")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -55,4 +64,4 @@ async def cmd_start(message, state: FSMContext):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    print(f"Run this app using: uvicorn main:app --host 0.0.0.0 --port {port}")
