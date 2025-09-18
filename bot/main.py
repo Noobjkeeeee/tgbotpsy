@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dotenv import load_dotenv
 import os
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,8 @@ from bot.states import Form
 from bot.storage import bot, dp
 
 import uvicorn
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
