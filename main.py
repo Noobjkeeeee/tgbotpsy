@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from aiogram.filters.command import CommandStart
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
 
 from admin import admin_router
 from handlers import free_consult, paid_consult, question
@@ -31,8 +32,6 @@ async def run_bot():
         await bot.delete_webhook(drop_pending_updates=True)
         logger.info("Webhook удален, начинается polling")
 
-        await cmd_start(bot)
-
         await dp.start_polling(bot)
     except Exception as exc:
         logger.error(f"Ошибка в основном цикле бота: {exc}", exc_info=True)
@@ -40,7 +39,7 @@ async def run_bot():
 
 
 @dp.message(CommandStart())
-async def cmd_start(message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext):
     try:
         await message.answer(
             "Здравствуйте! Я помогу вам отправить заявку. Выберите тип заявки:",
@@ -71,7 +70,7 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 logger.info("Бот корректно остановлен")
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
