@@ -7,4 +7,5 @@ menu_kb = ReplyKeyboardMarkup(
         [KeyboardButton(text="Запросить платную видеоконсультацию")],
     ],
     resize_keyboard=True,
+
 )

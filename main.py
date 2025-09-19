@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from aiogram.filters.command import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
-
+from database import init_db
 from admin import admin_router
 from handlers import free_consult, paid_consult, question
 from keyboards import menu_kb
@@ -24,6 +24,9 @@ bot_task = None
 
 async def run_bot():
     try:
+        await init_db()
+        logger.info("База данных инициализирована")
+
         dp.include_router(question.router)
         dp.include_router(free_consult.router)
         dp.include_router(paid_consult.router)
@@ -33,6 +36,7 @@ async def run_bot():
         logger.info("Webhook удален, начинается polling")
 
         await dp.start_polling(bot)
+
     except Exception as exc:
         logger.error(f"Ошибка в основном цикле бота: {exc}", exc_info=True)
         raise
