@@ -27,6 +27,11 @@ yes_no_kb = ReplyKeyboardMarkup(
     one_time_keyboard=True,
 )
 
+MAX_TELEGRAM_MSG_LENGTH = 4096
+
+def split_text(text: str):
+    return [text[i:i + MAX_TELEGRAM_MSG_LENGTH] for i in range(0, len(text), MAX_TELEGRAM_MSG_LENGTH)]
+
 
 @router.message(lambda m: m.text == "Задать вопрос психологу")
 async def start_question(message: types.Message, state: FSMContext):
@@ -145,22 +150,24 @@ async def handle_admin_reply(message: types.Message):
     question_text = question.question_text
     answer_text = message.text
 
-    group_message = (
+    group_message_prefix = (
         "Рубрика #анонимные_вопросы_психологу.\n\n"
         "Сегодня публикуем новый вопрос и ответ в нашей рубрике.\n\n"
         f"🟢 <b>Вопрос, анонимно:</b> {question_text}\n\n"
-        f"🟢 <b>Ответ психолога:</b> {answer_text}\n\n"
-        '<i>Напоминаем, что любой желающий может прислать нам свой вопрос в личные сообщения в Telegram @My_DialogueBot либо в сообщения группы Вконтакте через кнопку "написать сообщение". '
-        "Наши психологи в порядке живой очереди разберут сообщения и опубликуют ответы здесь и Вконтакте. "
-        "Это анонимно.\n\n"
-        "#ПряМойДиалог\n"
-        "#телефон_поддержки #группы_поддержки\n"
-        "#психологическая_помощь_мужчинам #психология\n"
-        "#психология_мужчинам\n"
-        "#анонимные_вопросы_психологу</i>"
+        f"🟢 <b>Ответ психолога:</b> "
     )
 
-    await bot.send_message(chat_id=GROUP_ID, text=group_message, parse_mode="HTML")
+    answer_parts = split_text(answer_text)
+
+    if answer_parts:
+        await bot.send_message(chat_id=GROUP_ID,
+                               text=group_message_prefix + answer_parts[0],
+                               parse_mode="HTML")
+
+        for part in answer_parts[1:]:
+            await bot.send_message(chat_id=GROUP_ID, text=part, parse_mode="HTML")
+    else:
+        await bot.send_message(chat_id=GROUP_ID, text=group_message_prefix, parse_mode="HTML")
 
     await bot.send_message(
         chat_id=user_id, text="✅ Ваш вопрос опубликован в группе. Спасибо за доверие!"
