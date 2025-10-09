@@ -5,6 +5,9 @@ class Form(StatesGroup):
     waiting_for_type = State()
     waiting_for_question = State()
     waiting_for_personal_data_agreement_question = State()
+    waiting_for_admin_action = State()
+    waiting_for_additional_answer = State()
+    waiting_for_edited_answer = State()
 
     waiting_for_name_free = State()
     waiting_for_phone_free = State()

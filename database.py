@@ -97,19 +97,13 @@ async def get_question_by_admin_message(admin_message_id: int):
         return result.scalar_one_or_none()
 
 
-async def update_question_answer(question_id: int, answer_text: str):
+async def update_question_answer(question_id: int, answer_text: str, status: str = "отвечен"):
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(Question).where(Question.id == question_id)
-        )
-        question = result.scalar_one_or_none()
+        question = await session.get(Question, question_id)
         if question:
             question.answer_text = answer_text
-            question.status = "опубликовано"
-            question.answered_at = datetime.datetime.now(timezone.utc)
+            question.status = status
             await session.commit()
-            return True
-        return False
 
 
 async def get_pending_questions_count():

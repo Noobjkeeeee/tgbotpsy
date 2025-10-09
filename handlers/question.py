@@ -29,8 +29,33 @@ yes_no_kb = ReplyKeyboardMarkup(
 
 MAX_TELEGRAM_MSG_LENGTH = 4096
 
+admin_actions_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📝 Ответить еще раз"), KeyboardButton(text="✏️ Редактировать ответ")],
+        [KeyboardButton(text="✅ Завершить вопрос"), KeyboardButton(text="🚫 Отменить")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+)
+
+
 def split_text(text: str):
     return [text[i:i + MAX_TELEGRAM_MSG_LENGTH] for i in range(0, len(text), MAX_TELEGRAM_MSG_LENGTH)]
+
+
+async def send_answer_to_group(question_text: str, answer_text: str):
+    group_message_prefix = (
+        "Рубрика #анонимные_вопросы_психологу.\n\n"
+        "Сегодня публикуем новый вопрос и ответ в нашей рубрике.\n\n"
+        f"🟢 <b>Вопрос, анонимно:</b> {question_text}\n\n"
+        f"🟢 <b>Ответ психолога:</b>\n\n"
+    )
+
+    full_message = group_message_prefix + answer_text
+    message_parts = split_text(full_message)
+
+    for part in message_parts:
+        await bot.send_message(chat_id=GROUP_ID, text=part, parse_mode="HTML")
 
 
 @router.message(lambda m: m.text == "Задать вопрос психологу")
@@ -133,7 +158,7 @@ async def personal_data_agreement(message: types.Message, state: FSMContext):
 
 
 @router.message(F.reply_to_message)
-async def handle_admin_reply(message: types.Message):
+async def handle_admin_reply(message: types.Message, state: FSMContext):
     replied_message = message.reply_to_message
     if replied_message.from_user.id != (await bot.get_me()).id:
         return
@@ -142,42 +167,134 @@ async def handle_admin_reply(message: types.Message):
     admin_message_id = replied_message.message_id
 
     question = await get_question_by_admin_and_message(admin_id, admin_message_id)
-    if not question or question.status != "ожидает":
-        await message.answer("❌ Вопрос не найден или уже обработан.")
+    if not question:
+        await message.answer("❌ Вопрос не найден.")
         return
 
-    user_id = question.user_id
-    question_text = question.question_text
-    answer_text = message.text
+    if question.status == "завершен":
+        await message.answer(
+            "❌ Этот вопрос уже завершен. Ответить больше нельзя.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
 
-    group_message_prefix = (
-        "Рубрика #анонимные_вопросы_психологу.\n\n"
-        "Сегодня публикуем новый вопрос и ответ в нашей рубрике.\n\n"
-        f"🟢 <b>Вопрос, анонимно:</b> {question_text}\n\n"
-        f"🟢 <b>Ответ психолога:</b> "
+    await state.update_data(
+        question_id=question.id,
+        user_id=question.user_id,
+        question_text=question.question_text,
+        current_answer=message.text,
+        admin_message_id=admin_message_id
     )
-
-    answer_parts = split_text(answer_text)
-
-    if answer_parts:
-        await bot.send_message(chat_id=GROUP_ID,
-                               text=group_message_prefix + answer_parts[0],
-                               parse_mode="HTML")
-
-        for part in answer_parts[1:]:
-            await bot.send_message(chat_id=GROUP_ID, text=part, parse_mode="HTML")
-    else:
-        await bot.send_message(chat_id=GROUP_ID, text=group_message_prefix, parse_mode="HTML")
-
-    await bot.send_message(
-        chat_id=user_id, text="✅ Ваш вопрос опубликован в группе. Спасибо за доверие!"
-    )
-
-    await update_question_answer(question.id, answer_text)
 
     await message.answer(
-        f"✅ Ответ для вопроса №{question.id} отправлен в группу и пользователь уведомлен."
+        f"📝 <b>Ответ на вопрос №{question.id}</b>\n\n"
+        f"❓ Вопрос: {question.question_text}\n\n"
+        f"💬 Ваш ответ ({len(message.text)} символов) готов.\n\n"
+        "Выберите действие:",
+        parse_mode="HTML",
+        reply_markup=admin_actions_kb
     )
+
+    await state.set_state(Form.waiting_for_admin_action)
+
+
+@router.message(StateFilter(Form.waiting_for_admin_action))
+async def handle_admin_action(message: types.Message, state: FSMContext):
+    action = message.text
+    data = await state.get_data()
+
+    question_id = data.get("question_id")
+    user_id = data.get("user_id")
+    question_text = data.get("question_text")
+    current_answer = data.get("current_answer")
+
+    if action == "📝 Ответить еще раз":
+        await message.answer(
+            "📝 Отправьте дополнительный ответ к этому вопросу:",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        await state.set_state(Form.waiting_for_additional_answer)
+
+    elif action == "✏️ Редактировать ответ":
+        preview_answer = current_answer[:1000] + "..." if len(current_answer) > 1000 else current_answer
+
+        await message.answer(
+            f"✏️ <b>Текущий ответ</b> ({len(current_answer)} символов):\n\n"
+            f"{preview_answer}\n\n"
+            "Отправьте исправленную версию ответа:",
+            parse_mode="HTML",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        await state.set_state(Form.waiting_for_edited_answer)
+
+    elif action == "✅ Завершить вопрос":
+        await send_answer_to_group(question_text, current_answer)
+
+        await bot.send_message(
+            chat_id=user_id,
+            text="✅ Ваш вопрос опубликован в группе. Спасибо за доверие!"
+        )
+
+        await update_question_answer(question_id, current_answer, status="завершен")
+
+        await message.answer(
+            f"✅ Вопрос №{question_id} завершен. Ответ отправлен в группу и пользователь уведомлен.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+
+        await state.clear()
+
+    elif action == "🚫 Отменить":
+        await message.answer(
+            "❌ Действие отменено. Вы можете ответить на вопрос позже.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        await state.clear()
+
+    else:
+        await message.answer(
+            "Пожалуйста, выберите действие с помощью кнопок ниже:",
+            reply_markup=admin_actions_kb
+        )
+
+
+@router.message(StateFilter(Form.waiting_for_additional_answer))
+async def handle_additional_answer(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    current_answer = data.get("current_answer", "")
+    new_answer = message.text
+
+    combined_answer = current_answer + "\n\n" + new_answer
+
+    await state.update_data(current_answer=combined_answer)
+
+    await message.answer(
+        f"📝 <b>Ответ обновлен</b>\n\n"
+        f"Теперь ответ состоит из {len(combined_answer)} символов.\n\n"
+        "Выберите действие:",
+        parse_mode="HTML",
+        reply_markup=admin_actions_kb
+    )
+
+    await state.set_state(Form.waiting_for_admin_action)
+
+
+@router.message(StateFilter(Form.waiting_for_edited_answer))
+async def handle_edited_answer(message: types.Message, state: FSMContext):
+    await state.update_data(current_answer=message.text)
+
+    preview_answer = message.text[:500] + "..." if len(message.text) > 500 else message.text
+
+    await message.answer(
+        f"✏️ <b>Ответ отредактирован</b>\n\n"
+        f"Теперь ответ состоит из {len(message.text)} символов.\n\n"
+        f"<b>Предпросмотр:</b>\n{preview_answer}\n\n"
+        "Выберите действие:",
+        parse_mode="HTML",
+        reply_markup=admin_actions_kb
+    )
+
+    await state.set_state(Form.waiting_for_admin_action)
 
 
 async def get_question_by_admin_and_message(admin_id: int, message_id: int):
@@ -189,8 +306,8 @@ async def get_question_by_admin_and_message(admin_id: int, message_id: int):
                 admin_msgs = json.loads(q.admin_messages)
                 for admin_msg in admin_msgs:
                     if (
-                        admin_msg["admin_id"] == admin_id
-                        and admin_msg["message_id"] == message_id
+                            admin_msg["admin_id"] == admin_id
+                            and admin_msg["message_id"] == message_id
                     ):
                         return q
     return None
